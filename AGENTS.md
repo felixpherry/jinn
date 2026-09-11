@@ -553,13 +553,15 @@ Skills refer to commands by **role**; the table below resolves each role to this
 
 | Role         | Command                   | Description                                                                                            |
 | ------------ | ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `vcs`        | Fossil                    | This project uses Fossil for version control (`fossil status`, `fossil diff`, `fossil timeline`, ...). |
+| `vcs`        | Git                       | Use `git status`, `git diff`, and `git log`. `origin` is `felixpherry/jinn`; `upstream` is read-only reference. |
 | `check`      | `just check`              | `cargo check --workspace` — fast compilation without codegen.                                          |
 | `test`       | `just test`               | `cargo test --workspace` + e2e tests — **all tests must pass before committing**.                      |
 | `lint`       | `just lint`               | Lint checks.                                                                                           |
 | `format`     | `just fmt-fix`            | Apply formatting fixes.                                                                                |
-| `commit`     | `just commit '<message>'` | Commit changes (uses `--dotfiles` so `.agents/` is included).                                          |
-| `sync-trunk` | `fossil merge trunk`      | Sync latest changes with your branch (resolve conflicts, re-test, commit).                             |
+| `commit`     | `just commit '<message>'` | Stage changes with Git and commit after tests pass. Review the staged diff first.                         |
+| `sync-trunk` | `git merge trunk`         | Sync local trunk into your working branch; resolve conflicts and re-test.                                |
+
+Sandcastle work stays on its assigned branch. The host orchestrator merges verified work into local `trunk` and closes issues. Agents never push or merge into `trunk`; pushing remains a manual user action. Legacy Fossil publishing recipes are disabled in this Git checkout.
 
 ### Plan Directory
 
@@ -569,6 +571,17 @@ Task plans live in `.plans/<task>/` where `<task>` is a slugified task name. Eac
 - `phase-N.md` — execution plans and phase reviews for each phase
 
 The task list (managed via `todo_*` tools) tracks progress. The spec is an immutable reference — agents annotate it with divergence notes but never rewrite it.
+
+## Agent skills
+
+### Issue tracker
+GitHub Issues in `felixpherry/jinn`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+Use the five default triage labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+Single-context layout. See `docs/agents/domain.md`.
 
 ## 8. Misc
 

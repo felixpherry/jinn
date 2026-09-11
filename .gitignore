@@ -15,3 +15,13 @@ pkg/
 *.tgz
 .kilo/
 .opencode/
+
+# Sandcastle dependencies, credentials, caches, and run artifacts
+.sandcastle/node_modules/
+.sandcastle/auth/
+.sandcastle/cache/
+.sandcastle/logs/
+.sandcastle/worktrees/
+.sandcastle/sessions/
+.sandcastle/patches/
+.sandcastle/run.lock

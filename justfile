@@ -7,15 +7,25 @@ export RUSTC_WRAPPER := env_var_or_default('RUSTC_WRAPPER', `command -v sccache 
 COPYRIGHT_NAME := "Jayson Lennon"
 COPYRIGHT_YEAR := "2026"
 
-fossil-branch NAME:
+# Retained for historical reference only; this checkout uses Git.
+[private]
+fossil-disabled:
+    @echo 'Legacy Fossil workflow disabled. Use Git; push only manually to origin.' >&2
+    @exit 1
+
+fossil-branch NAME: fossil-disabled
     fossil commit -m "Open {{NAME}}" --branch {{NAME}} --allow-empty
 
-# Commit changes (ONE LINE ONLY): stage all adds/removes (with `--dotfiles`) and commit.
+# Review changes and pass just test before committing.
 commit MSG:
-    fossil addremove --dotfiles && fossil commit -m "{{MSG}}"
+    git add --all
+    git diff --cached --check
+    git commit -m {{quote(MSG)}}
 
 test:
     cargo test --workspace
+    npm ci --prefix .sandcastle --ignore-scripts
+    npm test --prefix .sandcastle
 
 check:
     cargo check --workspace
@@ -143,6 +153,7 @@ lint:
     just clippy
     cargo fmt -- --check
     just lint-testattr
+    npm run check --prefix .sandcastle
 
 # Fail on bare #[test]/#[tokio::test] lacking an rstest attr (escapes the rstest timeout)
 lint-testattr:
@@ -154,7 +165,7 @@ lint-testattr:
    ALLOWLIST = {
        os.path.normpath("crates/jinn-domain/tests/tcaps_compile_fail.rs"),
    }
-   SKIP_DIRS = {"target", "vendor"}
+   SKIP_DIRS = {"target", "vendor", ".sandcastle", "node_modules", ".git"}
 
    def is_test_attr(s):
        if re.fullmatch(r"#\[test\]", s):
@@ -225,7 +236,7 @@ ci: lint test
 
 # Run all cucumber tests
 cucumber:
-    cargo test --test e2e -p jinn-e2e
+    just test
 
 # Rebuild the dao compile-time validation DB (forces jinn-domain build.rs on next check)
 dao-db-rebuild:
@@ -310,7 +321,7 @@ install-defaults:
     @echo "Skills installed to ~/.agents/skills/"
 
 # Report stale Fossil locks (hung processes + stale journal files)
-fossil-unlock:
+fossil-unlock: fossil-disabled
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -382,7 +393,7 @@ fossil-unlock:
     fi
 
 # Fix stale Fossil locks (kill hung processes + remove stale journal files)
-fossil-unlock-fix:
+fossil-unlock-fix: fossil-disabled
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -491,13 +502,13 @@ fossil-unlock-fix:
     fi
 
 # Mirror trunk history to GitHub (one-way, force push)
-sync-github:
+sync-github: fossil-disabled
    #!/bin/bash
    set -euo pipefail
 
    FOSSIL_REPO="/mnt/zed/repos/jinn/jinn.fossil"
    MIRROR_DIR="/mnt/zed/repos/jinn/.github-mirror"
-   GITHUB_REMOTE="git@github.com:jayson-lennon/jinn.git"
+   GITHUB_REMOTE="git@github.com:felixpherry/jinn.git"
 
    fossil git export "$MIRROR_DIR" \
        --repository "$FOSSIL_REPO" \
@@ -562,7 +573,7 @@ sync-github:
 #
 # Per-PR artifacts live in target/gh-pr/N/ (ignored via the `target` glob).
 # ---------------------------------------------------------------------------
-export GH_REPO := "jayson-lennon/jinn"
+export GH_REPO := "felixpherry/jinn"
 GH_PR_STATE_DIR := "target/gh-pr"
 
 # One-time: export GH_REPO so gh works outside git (gh repo set-default refuses fossil-only workspaces)
@@ -621,7 +632,7 @@ gh-pr-fetch N:
 # Clean apply: patch goes straight in. Conflicting hunks are written into
 # the files as `<<<<<<<`/`=======`/`>>>>>>>` markers (--merge) — resolve
 # them by hand or hand them to an agent (they're greppable), then land.
-gh-pr-apply N:
+gh-pr-apply N: fossil-disabled
     #!/usr/bin/env bash
     set -euo pipefail
     dir="{{GH_PR_STATE_DIR}}/{{N}}"
@@ -661,7 +672,7 @@ gh-pr-apply N:
 
 # Commit the applied patch attributed to the contributor (auto-provisions a fossil user).
 # Refuses to run while unresolved conflict markers remain in the tree.
-gh-pr-land N:
+gh-pr-land N: fossil-disabled
     #!/usr/bin/env bash
     set -euo pipefail
     dir="{{GH_PR_STATE_DIR}}/{{N}}"
@@ -721,7 +732,7 @@ gh-pr-close N COMMENT="":
     gh pr close {{N}} "${args[@]}"
 
 # Prune merged branches from the git mirror (preview default; PRUNE_ALL=1 also deletes unmerged)
-mirror-prune MODE="preview" PRUNE_ALL="":
+mirror-prune MODE="preview" PRUNE_ALL="": fossil-disabled
     #!/usr/bin/env bash
     set -euo pipefail
     MIRROR_DIR="/mnt/zed/repos/jinn/.github-mirror"
@@ -775,7 +786,7 @@ mirror-prune MODE="preview" PRUNE_ALL="":
     esac
 
 # Bump version (major/minor/patch), commit, and tag in Fossil
-bump LEVEL:
+bump LEVEL: fossil-disabled
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -880,6 +891,27 @@ unshm-target:
         echo "$SHM_DIR does not exist"
     fi
 
+# Sandcastle orchestration. These recipes never push commits.
+sandcastle-install:
+    npm ci --prefix .sandcastle --ignore-scripts
+
+sandcastle-build:
+    docker build --build-arg AGENT_UID=$(id -u) --build-arg AGENT_GID=$(id -g) -t sandcastle:jinn -f .sandcastle/Dockerfile .sandcastle
+
+sandcastle-auth:
+    node .sandcastle/seed-auth.mjs
+    bash .sandcastle/setup-token.sh
+
+sandcastle: sandcastle-install
+    npm start --prefix .sandcastle
+
+# Check tooling without starting an agent, merging, or changing GitHub issues.
+sandcastle-check: sandcastle-install
+    npm run check --prefix .sandcastle
+    npm test --prefix .sandcastle
+    bash -n .sandcastle/setup-token.sh
+    docker run --rm --entrypoint bash sandcastle:jinn -c 'rustc --version && just --version && git --version && gh --version && pi --version && claude --version'
+
 # Build the Arch package in ./build (isolated src/pkg scratch dirs; run from repo root)
 pkg:
     @mkdir -p build
@@ -917,11 +949,11 @@ build-release-tarball:
     echo "==> Created ${TARBALL}"
 
 # Release to GitHub + smoke-test cargo-binstall (after `just bump`; needs gh auth + cargo-binstall)
-release TAG:
+release TAG: fossil-disabled
     #!/usr/bin/env bash
     set -euo pipefail
 
-    REPO="jayson-lennon/jinn"
+    REPO="felixpherry/jinn"
 
     # --- Pre-flight: TAG must match the Cargo.toml version ---
     VERSION=$(sed -n '/^\[workspace\.package\]/,/^[\[]/{s/^version = "\(.*\)"/\1/p}' Cargo.toml)
