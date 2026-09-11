@@ -184,7 +184,7 @@ finish() {
 # Replace the example below. Set TOTAL_STAGES to match the stages you write.
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=1
+TOTAL_STAGES=2
 umask 077
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$REPO_ROOT/.sandcastle/.env"
@@ -205,5 +205,32 @@ if [[ ! "$GH_TOKEN" =~ ^github_pat_[A-Za-z0-9_]+$ ]]; then
 fi
 write_env GH_TOKEN "$GH_TOKEN"
 chmod 600 "$ENV_FILE"
+TOKEN="$GH_TOKEN"
 unset GH_TOKEN
+
+stage "Verify the token"
+say "Checking the saved token against felixpherry/jinn. Nothing is created or changed."
+# Pass the token explicitly and blank GITHUB_TOKEN so gh cannot silently fall
+# back to the broad host login and report a false pass.
+gh_scoped() { GH_TOKEN="$TOKEN" GITHUB_TOKEN="" gh "$@"; }
+
+if gh_scoped api "repos/felixpherry/jinn" --jq .full_name >/dev/null 2>&1; then
+  printf '  %s✓%s repository access (Metadata + Contents read)\n' "$GREEN" "$RESET"
+else
+  printf '  %s✗%s cannot read felixpherry/jinn\n' "$RED" "$RESET"
+  warn "Check Resource owner is felixpherry and the token selects the jinn repository."
+  SKIPPED+=("re-run this wizard: token cannot read felixpherry/jinn")
+fi
+
+if gh_scoped api "repos/felixpherry/jinn/issues?per_page=1" >/dev/null 2>&1; then
+  printf '  %s✓%s issues read\n' "$GREEN" "$RESET"
+else
+  printf '  %s✗%s cannot read issues\n' "$RED" "$RESET"
+  warn "Set Repository permissions → Issues → Read and write, then re-run."
+  SKIPPED+=("re-run this wizard: token cannot read issues")
+fi
+
+note "Issue write access cannot be proven without creating an issue, so it is not tested here."
+note "Sandcastle closes issues with this token; if that fails, Issues is set to read-only."
+unset TOKEN
 finish
