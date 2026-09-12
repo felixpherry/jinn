@@ -10,7 +10,7 @@ const piAgent = pi("openai-codex/gpt-6-astra", { thinking: "low" });
 const claudeAgent = claudeCode("opus", { effort: "high" });
 
 // Swap these two lines with the commented pair to reverse the roles.
-export const implementer = piAgent;
-export const reviewer = claudeAgent;
-// export const implementer = claudeAgent;
-// export const reviewer = piAgent;
+// export const implementer = piAgent;
+// export const reviewer = claudeAgent;
+export const implementer = claudeAgent;
+export const reviewer = piAgent;
