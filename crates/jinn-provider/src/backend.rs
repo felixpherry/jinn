@@ -15,6 +15,9 @@ pub struct BackendError;
 pub enum Backend {
     /// OpenAI (also covers OpenAI-compatible providers).
     OpenAI,
+    /// OpenAI Codex, reached through a ChatGPT subscription rather than an
+    /// API key. Speaks the Responses protocol against the Codex backend.
+    OpenAiCodex,
     /// Anthropic (Claude models).
     Anthropic,
     /// Ollama (local inference).
@@ -53,6 +56,7 @@ impl std::str::FromStr for Backend {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "openai" => Ok(Self::OpenAI),
+            "openai-codex" => Ok(Self::OpenAiCodex),
             "anthropic" => Ok(Self::Anthropic),
             "ollama" => Ok(Self::Ollama),
             "deepseek" => Ok(Self::DeepSeek),
@@ -77,6 +81,7 @@ impl std::fmt::Display for Backend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::OpenAI => write!(f, "openai"),
+            Self::OpenAiCodex => write!(f, "openai-codex"),
             Self::Anthropic => write!(f, "anthropic"),
             Self::Ollama => write!(f, "ollama"),
             Self::DeepSeek => write!(f, "deepseek"),
@@ -103,6 +108,7 @@ mod tests {
 
     #[rstest::rstest]
     #[case("openai", Backend::OpenAI)]
+    #[case("openai-codex", Backend::OpenAiCodex)]
     #[case("anthropic", Backend::Anthropic)]
     #[case("ollama", Backend::Ollama)]
     #[case("deepseek", Backend::DeepSeek)]

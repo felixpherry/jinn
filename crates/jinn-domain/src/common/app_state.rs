@@ -11,6 +11,7 @@
 
 pub use crate::common::focus::{FocusScope, ScopeStack};
 pub use crate::common::session_map::SessionLoadGuard;
+pub use crate::feat::auth::AuthState;
 pub use crate::feat::context::assembly_state::ContextAssemblyState;
 pub use crate::feat::provider::ProviderState;
 pub use crate::feat::pruner_accumulation_input::state::PrunerAccumulationInputState;
@@ -41,6 +42,8 @@ pub struct AppState {
     pub context: ContextAssemblyState,
     /// Provider selection state - owned by provider-actor.
     pub provider: ProviderState,
+    /// Subscription authentication state - owned by auth-actor.
+    pub auth: crate::feat::auth::AuthState,
     /// Frontend / UI state - owned by IntentHandler.
     pub frontend: FrontendState,
     /// Plugin contributions - owned by plugin-coordinator-actor.
@@ -71,6 +74,10 @@ impl AppState {
             PickerKind::McpServer => Some(self.frontend.mcp_server_picker_mut()),
             PickerKind::Plugin => Some(self.frontend.plugin_picker_mut()),
             PickerKind::Endpoint => Some(self.frontend.endpoint_picker_mut()),
+            PickerKind::AuthLogin => Some(self.frontend.auth_login_picker_mut()),
+            PickerKind::AuthMethod => Some(self.frontend.auth_method_picker_mut()),
+            PickerKind::AuthProgress => Some(self.frontend.auth_progress_picker_mut()),
+            PickerKind::AuthLogout => Some(self.frontend.auth_logout_picker_mut()),
         }
     }
     /// Read-only access to the active picker's navigation interface.
@@ -96,6 +103,10 @@ impl AppState {
             PickerKind::McpServer => Some(self.frontend.mcp_server_picker()),
             PickerKind::Plugin => Some(self.frontend.plugin_picker()),
             PickerKind::Endpoint => Some(self.frontend.endpoint_picker()),
+            PickerKind::AuthLogin => Some(self.frontend.auth_login_picker()),
+            PickerKind::AuthMethod => Some(self.frontend.auth_method_picker()),
+            PickerKind::AuthProgress => Some(self.frontend.auth_progress_picker()),
+            PickerKind::AuthLogout => Some(self.frontend.auth_logout_picker()),
         }
     }
 

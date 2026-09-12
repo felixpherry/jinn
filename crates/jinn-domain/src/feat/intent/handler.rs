@@ -395,12 +395,26 @@ impl IntentHandler {
                 feat::global::intent::handle_interrupt(state, session_id.as_ref())
             }
             Intent::EnterInsertMode => feat::chat_input::intent::handle_enter_insert_mode(state),
+            // Escape inside an authentication modal abandons the attempt, so
+            // a late authorization result cannot change the stored account.
+            Intent::EnterNormalMode
+                if state
+                    .frontend
+                    .scope_stack
+                    .picker_kind()
+                    .copied()
+                    .is_some_and(feat::auth::intent::is_auth_picker) =>
+            {
+                feat::auth::intent::handle_cancel_authentication(state)
+            }
             Intent::EnterNormalMode => feat::chat_input::intent::handle_enter_normal_mode(state),
             Intent::ToggleWhichkey => feat::global::intent::handle_toggle_whichkey(state),
             Intent::ToggleAuditPopup => feat::global::intent::handle_toggle_audit_popup(state),
             Intent::NormalEscape => feat::chat_input::intent::handle_normal_escape(state),
             Intent::NoOp => IntentResult::empty(),
 
+            Intent::OpenLoginPicker => feat::auth::intent::handle_open_login_picker(state),
+            Intent::OpenLogoutPicker => feat::auth::intent::handle_open_logout_picker(state),
             Intent::OpenPicker { kind } => feat::picker::intent::handle_open_picker(state, *kind),
             Intent::PickerInsertChar { ch } => feat::picker::intent::handle_insert_char(state, *ch),
             Intent::PickerBackspace => feat::picker::intent::handle_backspace(state),

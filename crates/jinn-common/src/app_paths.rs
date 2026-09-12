@@ -152,6 +152,16 @@ impl AppPaths {
         self.config_dir.join(APP_NAME).join("personas")
     }
 
+    /// Subscription credential storage (`~/.config/jinn/auth.json`).
+    ///
+    /// Deliberately separate from `providers.toml`: provider configuration is
+    /// meant to be edited and shared, credentials are not. The file is written
+    /// with owner-only permissions.
+    #[must_use]
+    pub fn auth_path(&self) -> PathBuf {
+        self.config_dir.join(APP_NAME).join("auth.json")
+    }
+
     /// Model cache file (`~/.cache/jinn/model_cache.json`).
     #[must_use]
     pub fn cache_path(&self) -> PathBuf {

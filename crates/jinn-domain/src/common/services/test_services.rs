@@ -19,6 +19,16 @@ use crate::feat::session::{SessionStore, SessionStoreError, SessionStoreService,
 use crate::protocol::SessionId;
 
 use super::Services;
+
+/// Builds an [`AuthService`](jinn_auth::AuthService) backed by in-memory
+/// storage and a fake subscription provider.
+///
+/// Tests that exercise login, logout, or provider availability get a working
+/// authentication service without touching the filesystem or the network.
+#[must_use]
+pub fn fake_auth_service() -> jinn_auth::AuthService {
+    jinn_auth::fake_auth_service().0
+}
 /// Single shared tokio runtime for the entire test binary.
 ///
 /// Initializes exactly once via `LazyLock`. Without this, every
@@ -271,6 +281,7 @@ impl TestServices {
                 ProviderRegistry::from_config(self.providers).expect("test registry"),
             ),
             api_keys: ApiKeysService::new(ApiKeys::new()),
+            auth: fake_auth_service(),
             config_storage: ConfigStorageService::new(Arc::new(InMemoryConfigStorage::new())),
             session_store: self
                 .session_store

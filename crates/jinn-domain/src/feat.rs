@@ -1,5 +1,6 @@
 //! Feature modules - domain-specific logic, actors, and UI elements.
 
+pub mod auth;
 pub mod auto_prune_worker;
 pub mod browser;
 pub mod browser_binary_scan;

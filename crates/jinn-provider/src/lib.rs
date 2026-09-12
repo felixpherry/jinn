@@ -22,7 +22,9 @@ mod fake;
 mod input_modalities;
 mod llm_message;
 mod no_providers;
+mod openai_codex;
 mod openai_compat;
+pub mod openai_responses;
 mod reasoning;
 mod retry;
 mod sample;
@@ -43,6 +45,10 @@ pub use fake::{FakeLlmServiceFactory, ScriptedResponse, TOOL_LOOP_TRIGGER};
 pub use input_modalities::{InputModalities, Modality};
 pub use llm_message::LlmMessage;
 pub use no_providers::{NO_PROVIDER_ID, NoProvidersAvailableFactory};
+pub use openai_codex::{
+    CODEX_PROVIDER_NAME, CodexModel, DEFAULT_CODEX_BASE_URL, OpenAiCodexFactory,
+    OpenAiCodexService, codex_models,
+};
 pub use openai_compat::{
     EndpointInfo, OpenAiCompatibleFactory, OpenAiCompatibleService, ProviderConfig, list_endpoints,
     list_endpoints_default_client,

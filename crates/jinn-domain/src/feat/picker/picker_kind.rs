@@ -40,6 +40,16 @@ pub enum PickerKind {
     /// OpenRouter endpoint picker - pin a specific routing upstream for
     /// prefix-cache affinity on an OpenRouter-served Single model.
     Endpoint,
+    /// Login provider picker - subscription providers jinn can authenticate
+    /// against, with their stored/unconfigured status.
+    AuthLogin,
+    /// Login method picker - how to complete the chosen provider's login.
+    AuthMethod,
+    /// Authentication modal - authorization instructions, progress, errors,
+    /// and the input for a pasted authorization code.
+    AuthProgress,
+    /// Logout picker - providers with stored credentials.
+    AuthLogout,
 }
 
 impl PickerKind {
@@ -47,7 +57,7 @@ impl PickerKind {
     ///
     /// Lets exhaustive drift tests (e.g. scope-binding coverage) iterate
     /// all kinds without a strum dependency.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 18] = [
         Self::Provider,
         Self::Session,
         Self::Persona,
@@ -61,8 +71,12 @@ impl PickerKind {
         Self::Project,
         Self::McpServer,
         Self::Plugin,
-        // Update this count when adding a variant; `Endpoint` is last.
         Self::Endpoint,
+        Self::AuthLogin,
+        Self::AuthMethod,
+        Self::AuthProgress,
+        // Update this count when adding a variant; `AuthLogout` is last.
+        Self::AuthLogout,
     ];
 }
 
@@ -88,6 +102,11 @@ impl std::fmt::Display for PickerKind {
             Self::Plugin => write!(f, "plugins"),
 
             Self::Endpoint => write!(f, "endpoints"),
+
+            Self::AuthLogin => write!(f, "login"),
+            Self::AuthMethod => write!(f, "login method"),
+            Self::AuthProgress => write!(f, "authentication"),
+            Self::AuthLogout => write!(f, "logout"),
         }
     }
 }
@@ -121,7 +140,11 @@ impl PickerKind {
             | Self::Project
             | Self::McpServer
             | Self::Plugin
-            | Self::Endpoint => 1,
+            | Self::Endpoint
+            | Self::AuthLogin
+            | Self::AuthMethod
+            | Self::AuthProgress
+            | Self::AuthLogout => 1,
         }
     }
 }

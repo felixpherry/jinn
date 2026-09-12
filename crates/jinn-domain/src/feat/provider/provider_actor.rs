@@ -22,6 +22,7 @@ use crate::common::actor_deps::{ActorDeps, BusPublish};
 use crate::common::state::State;
 use crate::common::tcaps::provider::{FrontendProviderPickerWrite, ModelCacheWrite, ProviderCap};
 use crate::common::tcaps::session::SessionCap;
+use crate::feat::auth::protocol::event::SubscriptionCredentialsChanged;
 use crate::feat::provider::protocol::command::{
     LoadCompactionModelPickerEntries, LoadEndpointPickerEntries, LoadProviderPickerEntries,
     LoadReasoningEffortPickerEntries, ProviderSwitch, RefreshEndpointPickerEntries,
@@ -91,6 +92,8 @@ impl Actor for ProviderActor {
             .await;
         bus.subscribe::<ModelsRefreshed, _>(&actor_ref).await;
         bus.subscribe::<ModelCacheLoaded, _>(&actor_ref).await;
+        bus.subscribe::<SubscriptionCredentialsChanged, _>(&actor_ref)
+            .await;
 
         Ok(Self {
             state: args.state,
@@ -121,6 +124,26 @@ impl Message<LoadProviderPickerEntries> for ProviderActor {
     async fn handle(
         &mut self,
         _msg: LoadProviderPickerEntries,
+        _ctx: &mut MsgContext<Self, Self::Reply>,
+    ) {
+        self.state.with_provider(&self.cap, |view| {
+            load_provider_picker_items(&self.deps.services, view);
+        });
+    }
+}
+
+/// Logging in or out changes which subscription models are available, so the
+/// model picker is rebuilt from the registry — the user sees the change without
+/// restarting jinn.
+///
+/// Availability itself lives in the registry; this only refreshes the rows
+/// already on screen.
+impl Message<SubscriptionCredentialsChanged> for ProviderActor {
+    type Reply = ();
+
+    async fn handle(
+        &mut self,
+        _msg: SubscriptionCredentialsChanged,
         _ctx: &mut MsgContext<Self, Self::Reply>,
     ) {
         self.state.with_provider(&self.cap, |view| {

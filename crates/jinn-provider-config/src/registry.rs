@@ -14,7 +14,10 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use error_stack::{Report, ResultExt as _};
-use jinn_provider::{Backend, ReasoningEffort};
+use jinn_auth::{AuthProviderId, AuthService};
+use jinn_provider::{
+    Backend, CODEX_PROVIDER_NAME, OpenAiCodexFactory, ReasoningEffort, codex_models,
+};
 
 use super::SampleLlmServiceFactory;
 use super::api_keys::ApiKeys;
@@ -41,6 +44,12 @@ pub struct ProviderRegistry {
     /// scripted fake instead of erroring on the (empty in tests) registry.
     /// `None` in production. See [`with_factory_override`](Self::with_factory_override).
     factory_override: Option<FactoryOverride>,
+    /// Subscription authentication, when the application has wired it.
+    ///
+    /// Present in production and in tests that exercise subscription
+    /// providers. It decides whether subscription-backed models are available
+    /// and supplies the access tokens their requests need.
+    subscription_auth: Option<AuthService>,
 }
 
 impl ProviderRegistry {
@@ -119,6 +128,7 @@ impl ProviderRegistry {
             resolved_map,
             resolved_list,
             factory_override: None,
+            subscription_auth: None,
         })
     }
 
@@ -148,6 +158,57 @@ impl ProviderRegistry {
     /// to carry the override across startup swaps.
     pub(crate) fn set_factory_override(&mut self, factory: Option<FactoryOverride>) {
         self.factory_override = factory;
+    }
+
+    /// Attaches subscription authentication and registers the built-in
+    /// subscription models.
+    ///
+    /// Subscription models are not user configuration: they ship with jinn, so
+    /// they are added here rather than read from `providers.toml`. A user block
+    /// that already claims the same `{provider}/{model}` id wins, keeping any
+    /// hand-written override authoritative.
+    #[must_use]
+    pub fn with_subscription_auth(mut self, auth: AuthService) -> Self {
+        self.set_subscription_auth(auth);
+        self
+    }
+
+    /// Attaches subscription authentication in place.
+    pub fn set_subscription_auth(&mut self, auth: AuthService) {
+        self.subscription_auth = Some(auth);
+        self.register_subscription_models();
+    }
+
+    /// Returns the attached subscription authentication, if any.
+    ///
+    /// Used by [`ProviderRegistryService::replace`](super::registry_service::ProviderRegistryService::replace)
+    /// to carry the wiring across the init actor's rebuild-from-config.
+    pub(crate) fn subscription_auth(&self) -> Option<AuthService> {
+        self.subscription_auth.clone()
+    }
+
+    /// Adds one entry per built-in subscription model.
+    fn register_subscription_models(&mut self) {
+        for model in codex_models() {
+            let id = ProviderId::new(format!("{CODEX_PROVIDER_NAME}/{}", model.id));
+            if self.resolved_map.contains_key(&id) {
+                continue;
+            }
+            let resolved = ResolvedProvider {
+                id: id.clone(),
+                name: CODEX_PROVIDER_NAME.to_owned(),
+                model: model.id.to_owned(),
+                backend: CODEX_PROVIDER_NAME.to_owned(),
+                base_url: None,
+                api_key_env: None,
+                requires_key: false,
+                extra_body: None,
+                is_remote: false,
+                context_length: Some(model.context_length),
+            };
+            self.resolved_list.push(resolved.clone());
+            self.resolved_map.insert(id, resolved);
+        }
     }
 
     /// Returns a reference to the underlying config (for persistence).
@@ -246,7 +307,7 @@ impl ProviderRegistry {
         let Some(resolved) = self.get(id) else {
             return false;
         };
-        resolved_is_available(resolved, api_keys)
+        resolved_is_available(resolved, api_keys, self.subscription_auth.as_ref())
     }
 
     /// Returns all providers that are currently available given the resolved keys.
@@ -254,7 +315,7 @@ impl ProviderRegistry {
     pub fn available_providers(&self, api_keys: &ApiKeys) -> Vec<&ResolvedProvider> {
         self.resolved_list
             .iter()
-            .filter(|p| resolved_is_available(p, api_keys))
+            .filter(|p| resolved_is_available(p, api_keys, self.subscription_auth.as_ref()))
             .collect()
     }
 
@@ -263,7 +324,7 @@ impl ProviderRegistry {
     pub fn unavailable_providers(&self, api_keys: &ApiKeys) -> Vec<&ResolvedProvider> {
         self.resolved_list
             .iter()
-            .filter(|p| !resolved_is_available(p, api_keys))
+            .filter(|p| !resolved_is_available(p, api_keys, self.subscription_auth.as_ref()))
             .collect()
     }
 
@@ -305,7 +366,6 @@ impl ProviderRegistry {
     }
 
     /// Creates a factory from a statically resolved provider entry.
-    #[expect(clippy::unused_self, reason = "called via self from create_factory")]
     fn create_factory_from_resolved(
         &self,
         resolved: &ResolvedProvider,
@@ -316,6 +376,10 @@ impl ProviderRegistry {
         if resolved.backend == "sample" {
             let factory: Box<dyn LlmServiceFactory> = Box::new(SampleLlmServiceFactory);
             return Ok(factory);
+        }
+
+        if resolved.backend == CODEX_PROVIDER_NAME {
+            return self.create_subscription_factory(resolved, reasoning);
         }
 
         let backend: Backend = resolved
@@ -359,6 +423,38 @@ impl ProviderRegistry {
     }
 }
 
+impl ProviderRegistry {
+    /// Creates a factory for a subscription-backed provider.
+    ///
+    /// Requests are billed to the subscription: when no credential is stored,
+    /// the request fails rather than silently falling back to API-key access.
+    fn create_subscription_factory(
+        &self,
+        resolved: &ResolvedProvider,
+        reasoning: Option<ReasoningEffort>,
+    ) -> Result<Box<dyn LlmServiceFactory>, Report<LlmServiceError>> {
+        let tokens = self
+            .subscription_auth
+            .as_ref()
+            .filter(|auth| auth.has_credentials(AuthProviderId::OpenAiCodex))
+            .and_then(|auth| auth.access_token_provider(AuthProviderId::OpenAiCodex))
+            .ok_or_else(|| {
+                Report::new(LlmServiceError::ApiKey).attach(format!(
+                    "no subscription login is configured for provider '{}'",
+                    resolved.name
+                ))
+            })?;
+
+        Ok(Box::new(OpenAiCodexFactory::new(
+            resolved.name.clone(),
+            resolved.model.clone(),
+            resolved.base_url.clone(),
+            tokens,
+            reasoning,
+        )))
+    }
+}
+
 /// Merges a pinned OpenRouter routing endpoint into a provider's `extra_body`.
 ///
 /// When `tag` is `Some`, injects `provider: { order: [tag], allow_fallbacks: false }`
@@ -386,8 +482,19 @@ fn merge_endpoint_override(
     Some(serde_json::Value::Object(map))
 }
 
-/// Checks a single resolved provider's availability against resolved keys.
-fn resolved_is_available(resolved: &ResolvedProvider, api_keys: &ApiKeys) -> bool {
+/// Checks a single resolved provider's availability.
+///
+/// Subscription providers are available exactly when a credential is stored
+/// for them; everything else depends on its API key.
+fn resolved_is_available(
+    resolved: &ResolvedProvider,
+    api_keys: &ApiKeys,
+    subscription_auth: Option<&AuthService>,
+) -> bool {
+    if resolved.backend == CODEX_PROVIDER_NAME {
+        return subscription_auth
+            .is_some_and(|auth| auth.has_credentials(AuthProviderId::OpenAiCodex));
+    }
     if !resolved.requires_key {
         return true;
     }

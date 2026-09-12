@@ -182,6 +182,9 @@ pub fn init_with_control_toggle(control_toggle: &str) -> Keymap<KeyEvent, Scope,
             .bind("<leader>sc", Intent::OpenPicker { kind: PickerKind::CompactionModel }, KeyCategory::Model)
             .describe_group_with_category("<leader>c", "change", KeyCategory::General)
             .bind("<leader>cd", Intent::OpenCwdInput, KeyCategory::General)
+            // Subscription login / logout.
+            .bind("<leader>l", Intent::OpenLoginPicker, KeyCategory::General)
+            .bind("<leader>L", Intent::OpenLogoutPicker, KeyCategory::General)
             .bind("gg", Intent::ScrollToTop, KeyCategory::Navigation)
             .bind("G", Intent::ScrollToBottom, KeyCategory::Navigation)
             .bind("gmr", Intent::RefreshModels, KeyCategory::Model)
@@ -411,6 +414,18 @@ pub fn init_with_control_toggle(control_toggle: &str) -> Keymap<KeyEvent, Scope,
              .bind("<c-r>", Intent::RefreshSkills, KeyCategory::General);
         })
         .scope(Scope::PickerTaskList, |b| {
+            add_picker_base(b);
+        })
+        .scope(Scope::PickerAuthLogin, |b| {
+            add_picker_base(b);
+        })
+        .scope(Scope::PickerAuthMethod, |b| {
+            add_picker_base(b);
+        })
+        .scope(Scope::PickerAuthProgress, |b| {
+            add_picker_base(b);
+        })
+        .scope(Scope::PickerAuthLogout, |b| {
             add_picker_base(b);
         })
         .scope(Scope::PickerProject, |b| {
@@ -811,6 +826,10 @@ mod tests {
     #[case(Scope::PickerProject)]
     #[case(Scope::PickerMcpServer)]
     #[case(Scope::PickerPlugin)]
+    #[case(Scope::PickerAuthLogin)]
+    #[case(Scope::PickerAuthMethod)]
+    #[case(Scope::PickerAuthProgress)]
+    #[case(Scope::PickerAuthLogout)]
     #[case(Scope::ArgInput)]
     #[case(Scope::SidebarResize)]
     #[case(Scope::RenameSessionInput)]
@@ -877,6 +896,10 @@ mod tests {
     #[case(Scope::PickerProject)]
     #[case(Scope::PickerMcpServer)]
     #[case(Scope::PickerPlugin)]
+    #[case(Scope::PickerAuthLogin)]
+    #[case(Scope::PickerAuthMethod)]
+    #[case(Scope::PickerAuthProgress)]
+    #[case(Scope::PickerAuthLogout)]
     #[case(Scope::SidebarResize)]
     #[case(Scope::RenameSessionInput)]
     #[case(Scope::PrunerAccumulationInput)]
@@ -1637,6 +1660,66 @@ mod tests {
                 "<leader>sP must resolve to OpenPicker{{Plugin}}; got {action:?}",
             ),
             other => panic!("<leader>sP must be a leaf, got branch: {other:?}"),
+        }
+    }
+
+    #[rstest::rstest]
+    fn leader_l_resolves_to_the_login_picker() {
+        // Given the default keymap.
+        use jinn_domain::{Key, KeyEvent, Modifiers};
+        use ratatui_which_key::NodeResult;
+        let keymap = init();
+        let path = [
+            KeyEvent {
+                key: Key::Char(' '),
+                modifiers: Modifiers::none(),
+            },
+            KeyEvent {
+                key: Key::Char('l'),
+                modifiers: Modifiers::none(),
+            },
+        ];
+
+        // When navigating the <leader>l sequence.
+        let result = keymap.navigate(&path, &Scope::Normal).expect("path exists");
+
+        // Then it resolves to OpenLoginPicker.
+        match result {
+            NodeResult::Leaf { action } => assert!(
+                matches!(action, Intent::OpenLoginPicker),
+                "<leader>l must resolve to OpenLoginPicker; got {action:?}",
+            ),
+            other => panic!("<leader>l must be a leaf, got branch: {other:?}"),
+        }
+    }
+
+    #[rstest::rstest]
+    fn leader_l_capital_resolves_to_the_logout_picker() {
+        // Given the default keymap.
+        use jinn_domain::{Key, KeyEvent, Modifiers};
+        use ratatui_which_key::NodeResult;
+        let keymap = init();
+        let path = [
+            KeyEvent {
+                key: Key::Char(' '),
+                modifiers: Modifiers::none(),
+            },
+            KeyEvent {
+                key: Key::Char('L'),
+                modifiers: Modifiers::none(),
+            },
+        ];
+
+        // When navigating the <leader>L sequence.
+        let result = keymap.navigate(&path, &Scope::Normal).expect("path exists");
+
+        // Then it resolves to OpenLogoutPicker, not the lowercase login.
+        match result {
+            NodeResult::Leaf { action } => assert!(
+                matches!(action, Intent::OpenLogoutPicker),
+                "<leader>L must resolve to OpenLogoutPicker; got {action:?}",
+            ),
+            other => panic!("<leader>L must be a leaf, got branch: {other:?}"),
         }
     }
 

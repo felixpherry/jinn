@@ -2545,6 +2545,7 @@ dependencies = [
  "dotenvy",
  "error-stack",
  "jiff",
+ "jinn-auth",
  "jinn-cli",
  "jinn-discord",
  "jinn-domain",
@@ -2569,6 +2570,33 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "wherror",
+]
+
+[[package]]
+name = "jinn-auth"
+version = "0.116.1"
+dependencies = [
+ "async-trait",
+ "base64",
+ "ctor",
+ "derive_more",
+ "error-stack",
+ "futures",
+ "jiff",
+ "mockito",
+ "parking_lot",
+ "rand 0.9.5",
+ "reqwest 0.13.3",
+ "rstest",
+ "rustls 0.23.42",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "url",
  "wherror",
 ]
 
@@ -2649,6 +2677,7 @@ dependencies = [
  "humantime",
  "indoc",
  "jiff",
+ "jinn-auth",
  "jinn-common",
  "jinn-core-types",
  "jinn-mcp",
@@ -2765,9 +2794,11 @@ dependencies = [
  "async-trait",
  "base64",
  "ctor",
+ "derive_more",
  "error-stack",
  "futures",
  "jiff",
+ "jinn-auth",
  "mockito",
  "parking_lot",
  "rand 0.9.5",
@@ -2779,6 +2810,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
+ "uuid",
  "wherror",
 ]
 
@@ -2789,6 +2821,7 @@ dependencies = [
  "dirs",
  "error-stack",
  "jiff",
+ "jinn-auth",
  "jinn-common",
  "jinn-provider",
  "parking_lot",
@@ -2796,6 +2829,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
  "toml 0.8.23",
  "toml_edit 0.22.27",
  "tracing",

@@ -106,6 +106,11 @@ pub enum Intent {
     /// Dismisses any active confirmation prompt via the pre-match interceptors.
     NoOp,
 
+    /// Open the login picker - subscription providers jinn can authenticate
+    /// against.
+    OpenLoginPicker,
+    /// Open the logout picker - providers with stored credentials.
+    OpenLogoutPicker,
     /// Open a picker of the specified kind.
     OpenPicker {
         /// Which picker to open.
@@ -477,6 +482,8 @@ impl std::fmt::Display for Intent {
             Intent::ToggleWhichkey => write!(f, "toggle which-key"),
             Intent::NormalEscape => write!(f, "escape"),
             Intent::NoOp => write!(f, "no-op"),
+            Intent::OpenLoginPicker => write!(f, "login"),
+            Intent::OpenLogoutPicker => write!(f, "logout"),
             Intent::OpenPicker { kind } => write!(f, "search {kind}"),
             Intent::PickerInsertChar { ch } => write!(f, "picker insert '{ch}'"),
             Intent::PickerBackspace => write!(f, "picker backspace"),

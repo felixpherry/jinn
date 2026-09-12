@@ -9,6 +9,7 @@ edition.workspace = true
 syntax-all = ["ratatui-markdown/highlight-lang-all"]
 
 [dependencies]
+jinn-auth = { workspace = true }
 # Internal deps
 jinn-provider = { workspace = true }
 jinn-common = { workspace = true }

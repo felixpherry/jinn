@@ -81,11 +81,24 @@ pub fn validate_picker_confirm(state: &AppState) -> Result<(), PickerConfirmErro
         PickerKind::Skill => state.frontend.skill_picker().selected_item().is_some(),
         // TaskList and Plugin are read-only; Enter is a no-op. Skip the
         // selection gate so the confirm handler (which itself returns
-        // empty) is always reached.
-        PickerKind::TaskList | PickerKind::Plugin => true,
+        // empty) is always reached. The authentication modal holds no rows
+        // at all: Enter submits the pasted code or retries, so the gate must
+        // not block it either.
+        PickerKind::TaskList | PickerKind::Plugin | PickerKind::AuthProgress => true,
         PickerKind::Project => state.frontend.project_picker().selected_item().is_some(),
         PickerKind::McpServer => state.frontend.mcp_server_picker().selected_item().is_some(),
         PickerKind::Endpoint => state.frontend.endpoint_picker().selected_item().is_some(),
+        PickerKind::AuthLogin => state.frontend.auth_login_picker().selected_item().is_some(),
+        PickerKind::AuthMethod => state
+            .frontend
+            .auth_method_picker()
+            .selected_item()
+            .is_some(),
+        PickerKind::AuthLogout => state
+            .frontend
+            .auth_logout_picker()
+            .selected_item()
+            .is_some(),
     };
 
     if has_selection {

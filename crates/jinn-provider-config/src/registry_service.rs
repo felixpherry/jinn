@@ -134,8 +134,21 @@ impl ProviderRegistryService {
         // Carry the test-injected factory override across the swap so it
         // survives the init actor's rebuild-from-config at startup.
         let preserved = guard.factory_override();
+        // Subscription wiring is set once at startup; the rebuild would
+        // otherwise drop it and take every subscription model offline.
+        let auth = guard.subscription_auth();
         *guard = registry;
+        if let Some(auth) = auth {
+            guard.set_subscription_auth(auth);
+        }
         guard.set_factory_override(preserved);
+    }
+
+    /// Attaches subscription authentication, registering the built-in
+    /// subscription models and making their availability follow stored
+    /// credentials.
+    pub fn set_subscription_auth(&self, auth: jinn_auth::AuthService) {
+        self.inner.write().set_subscription_auth(auth);
     }
 
     /// Updates the default provider in the config.

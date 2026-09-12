@@ -44,6 +44,18 @@ pub(super) fn render_picker(frame: &mut Frame<'_>, area: Rect, ctx: &RenderCtx) 
         Some(PickerKind::Plugin) => {
             jinn_domain::feat::picker::render::render_plugin_picker(frame, area, ctx);
         }
+        Some(PickerKind::AuthLogin) => {
+            jinn_domain::feat::auth::picker_render::render_login_picker(frame, area, ctx);
+        }
+        Some(PickerKind::AuthMethod) => {
+            jinn_domain::feat::auth::picker_render::render_auth_method_picker(frame, area, ctx);
+        }
+        Some(PickerKind::AuthProgress) => {
+            jinn_domain::feat::auth::picker_render::render_auth_progress(frame, area, ctx);
+        }
+        Some(PickerKind::AuthLogout) => {
+            jinn_domain::feat::auth::picker_render::render_logout_picker(frame, area, ctx);
+        }
         None => {}
     }
 }

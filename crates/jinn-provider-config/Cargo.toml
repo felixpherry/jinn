@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 # Internal deps
+jinn-auth = { workspace = true }
 jinn-provider = { workspace = true }
 jinn-common = { workspace = true }
 
@@ -22,6 +23,7 @@ wherror = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
 tempfile = { workspace = true }
 
 [lints]

@@ -51,6 +51,14 @@ pub enum Scope {
     PickerMcpServer,
     /// Picker - Read-only plugin list.
     PickerPlugin,
+    /// Picker - Subscription provider to log in to.
+    PickerAuthLogin,
+    /// Picker - How to complete the chosen provider's login.
+    PickerAuthMethod,
+    /// Picker - The modal carrying an authorization through to completion.
+    PickerAuthProgress,
+    /// Picker - Provider to log out of.
+    PickerAuthLogout,
     /// Input mode - typing into the input buffer.
     Input,
     /// Arg input mode - typing positional args for a lifecycle command.
@@ -103,6 +111,10 @@ impl std::fmt::Display for Scope {
             Self::PickerProject => write!(f, "Picker(project)"),
             Self::PickerMcpServer => write!(f, "Picker(mcp-server)"),
             Self::PickerPlugin => write!(f, "Picker(plugin)"),
+            Self::PickerAuthLogin => write!(f, "Picker(auth-login)"),
+            Self::PickerAuthMethod => write!(f, "Picker(auth-method)"),
+            Self::PickerAuthProgress => write!(f, "Picker(auth-progress)"),
+            Self::PickerAuthLogout => write!(f, "Picker(auth-logout)"),
             Self::Input => write!(f, "Input"),
             Self::Dashboard => write!(f, "Dashboard"),
             Self::TerminalView => write!(f, "TerminalView"),
@@ -145,6 +157,10 @@ impl std::str::FromStr for Scope {
             "Picker(project)" => Ok(Self::PickerProject),
             "Picker(mcp-server)" => Ok(Self::PickerMcpServer),
             "Picker(plugin)" => Ok(Self::PickerPlugin),
+            "Picker(auth-login)" => Ok(Self::PickerAuthLogin),
+            "Picker(auth-method)" => Ok(Self::PickerAuthMethod),
+            "Picker(auth-progress)" => Ok(Self::PickerAuthProgress),
+            "Picker(auth-logout)" => Ok(Self::PickerAuthLogout),
             "Input" => Ok(Self::Input),
             "Dashboard" => Ok(Self::Dashboard),
             "ArgInput" => Ok(Self::ArgInput),

@@ -132,6 +132,13 @@ where
     colors: SelectionColors,
     /// Optional style override for the border title.
     title_style: Option<Style>,
+    /// Lines to draw in the results area instead of the filtered items.
+    ///
+    /// Modals that reuse the picker chrome for something other than a list —
+    /// showing authorization instructions above a text input, for example —
+    /// set this so the popup keeps the familiar geometry, border, filter line
+    /// and footer while presenting their own body.
+    body: Option<Vec<Line<'a>>>,
 }
 
 impl<'a, T> SelectionWidget<'a, T>
@@ -142,6 +149,7 @@ where
     pub fn new(state: &'a SelectionState<T>) -> Self {
         Self {
             title: Line::from(""),
+            body: None,
             state,
             footers: Vec::new(),
             colors: SelectionColors::default(),
@@ -189,6 +197,13 @@ where
     #[must_use]
     pub fn title_style(mut self, style: Style) -> Self {
         self.title_style = Some(style);
+        self
+    }
+
+    /// Draws `lines` in the results area instead of the filtered item rows.
+    #[must_use]
+    pub fn body(mut self, lines: Vec<Line<'a>>) -> Self {
+        self.body = Some(lines);
         self
     }
 
@@ -247,7 +262,13 @@ where
             Paragraph::new(separator).style(Style::default().fg(self.colors.separator));
         frame.render_widget(sep_paragraph, separator_area);
 
-        // Results area - windowed display with scroll_offset.
+        // Results area - caller-supplied body, or the windowed item list.
+        if let Some(body) = self.body {
+            frame.render_widget(Paragraph::new(body), results_area);
+            render_footers(frame, footer_block, &self.footers, self.colors.footer);
+            return;
+        }
+
         let max_visible = results_area.height as usize;
         let scroll_offset = self.state.scroll_offset();
         let selection = self.state.selection();

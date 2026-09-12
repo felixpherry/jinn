@@ -8,6 +8,7 @@
 use crate::feat::endpoint::picker_entry::EndpointEntry;
 use std::collections::HashSet;
 
+use crate::feat::auth::picker_entry::{AuthMethodEntry, AuthProviderEntry};
 use crate::feat::mcp::picker_entry::McpServerEntry;
 use crate::feat::persona::PersonaEntry;
 use crate::feat::plugin::PluginPickerEntry;
@@ -103,6 +104,24 @@ pub struct PickerStates {
     /// Snapshot of enabled MCP servers before picker opens - restored on ESC.
     /// OWNER: IntentHandler (set on MCP picker open, consumed on confirm/cancel).
     pub mcp_server_picker_snapshot: Option<std::collections::BTreeSet<String>>,
+
+    /// Login provider picker state - one row per subscription provider.
+    /// OWNER: AuthActor (loads rows), IntentHandler (navigates).
+    pub auth_login_picker: jinn_selection_widget::SelectionState<AuthProviderEntry>,
+
+    /// Login method picker state - one row per supported login method.
+    /// OWNER: IntentHandler (populated from the chosen provider's row).
+    pub auth_method_picker: jinn_selection_widget::SelectionState<AuthMethodEntry>,
+
+    /// Authentication modal state. Holds no rows: its filter line is where the
+    /// user pastes an authorization code, and its body is drawn from
+    /// `AppState::auth`.
+    /// OWNER: IntentHandler (the pasted-code input).
+    pub auth_progress_picker: jinn_selection_widget::SelectionState<AuthMethodEntry>,
+
+    /// Logout picker state - one row per provider with stored credentials.
+    /// OWNER: AuthActor (loads rows), IntentHandler (navigates).
+    pub auth_logout_picker: jinn_selection_widget::SelectionState<AuthProviderEntry>,
 
     /// OpenRouter endpoint picker state - one row per routing upstream.
     /// OWNER: IntentHandler (populated on endpoint picker open).
@@ -228,6 +247,34 @@ pub trait PickerExt {
     fn plugin_picker_mut(
         &mut self,
     ) -> &mut jinn_selection_widget::SelectionState<PluginPickerEntry>;
+
+    /// Read-only access to the login provider picker state.
+    fn auth_login_picker(&self) -> &jinn_selection_widget::SelectionState<AuthProviderEntry>;
+    /// Mutable access to the login provider picker state.
+    fn auth_login_picker_mut(
+        &mut self,
+    ) -> &mut jinn_selection_widget::SelectionState<AuthProviderEntry>;
+
+    /// Read-only access to the login method picker state.
+    fn auth_method_picker(&self) -> &jinn_selection_widget::SelectionState<AuthMethodEntry>;
+    /// Mutable access to the login method picker state.
+    fn auth_method_picker_mut(
+        &mut self,
+    ) -> &mut jinn_selection_widget::SelectionState<AuthMethodEntry>;
+
+    /// Read-only access to the authentication modal's input state.
+    fn auth_progress_picker(&self) -> &jinn_selection_widget::SelectionState<AuthMethodEntry>;
+    /// Mutable access to the authentication modal's input state.
+    fn auth_progress_picker_mut(
+        &mut self,
+    ) -> &mut jinn_selection_widget::SelectionState<AuthMethodEntry>;
+
+    /// Read-only access to the logout picker state.
+    fn auth_logout_picker(&self) -> &jinn_selection_widget::SelectionState<AuthProviderEntry>;
+    /// Mutable access to the logout picker state.
+    fn auth_logout_picker_mut(
+        &mut self,
+    ) -> &mut jinn_selection_widget::SelectionState<AuthProviderEntry>;
 
     /// Read-only access to the OpenRouter endpoint picker state.
     fn endpoint_picker(&self) -> &jinn_selection_widget::SelectionState<EndpointEntry>;
@@ -408,6 +455,46 @@ impl PickerExt for super::frontend_state::FrontendState {
 
     fn endpoint_picker_mut(&mut self) -> &mut jinn_selection_widget::SelectionState<EndpointEntry> {
         &mut self.pickers.endpoint_picker
+    }
+
+    fn auth_login_picker(&self) -> &jinn_selection_widget::SelectionState<AuthProviderEntry> {
+        &self.pickers.auth_login_picker
+    }
+
+    fn auth_login_picker_mut(
+        &mut self,
+    ) -> &mut jinn_selection_widget::SelectionState<AuthProviderEntry> {
+        &mut self.pickers.auth_login_picker
+    }
+
+    fn auth_method_picker(&self) -> &jinn_selection_widget::SelectionState<AuthMethodEntry> {
+        &self.pickers.auth_method_picker
+    }
+
+    fn auth_method_picker_mut(
+        &mut self,
+    ) -> &mut jinn_selection_widget::SelectionState<AuthMethodEntry> {
+        &mut self.pickers.auth_method_picker
+    }
+
+    fn auth_progress_picker(&self) -> &jinn_selection_widget::SelectionState<AuthMethodEntry> {
+        &self.pickers.auth_progress_picker
+    }
+
+    fn auth_progress_picker_mut(
+        &mut self,
+    ) -> &mut jinn_selection_widget::SelectionState<AuthMethodEntry> {
+        &mut self.pickers.auth_progress_picker
+    }
+
+    fn auth_logout_picker(&self) -> &jinn_selection_widget::SelectionState<AuthProviderEntry> {
+        &self.pickers.auth_logout_picker
+    }
+
+    fn auth_logout_picker_mut(
+        &mut self,
+    ) -> &mut jinn_selection_widget::SelectionState<AuthProviderEntry> {
+        &mut self.pickers.auth_logout_picker
     }
 
     fn picker_results_viewport(&self) -> u16 {

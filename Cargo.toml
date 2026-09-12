@@ -51,6 +51,7 @@ jinn-cli = { workspace = true }
 jinn-plugin = { workspace = true }
 jinn-plugin-api = { workspace = true }
 jinn-tui = { workspace = true }
+jinn-auth = { workspace = true }
 jinn-domain = { workspace = true }
 jinn-discord = { workspace = true }
 
@@ -114,6 +115,7 @@ ratatui-markdown = { path = "vendor/ratatui-markdown", features = [
   "highlight-lang-c",
   "highlight-lang-cpp",
 ] }
+jinn-auth = { path = "crates/jinn-auth" }
 jinn-provider = { path = "crates/jinn-provider" }
 jinn-tui = { path = "crates/jinn-tui" }
 jinn-cli = { path = "crates/jinn-cli" }

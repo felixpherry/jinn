@@ -181,12 +181,29 @@ impl ActorSystemBuilder {
 
         let root = jinn_domain::common::root_supervisor::RootSupervisor::spawn_root().await;
 
+        // Subscription authentication: one credential record per provider in
+        // its own owner-only file, shared across projects.
+        let auth = jinn_auth::AuthService::new(
+            jinn_auth::CredentialStoreService::new(std::sync::Arc::new(
+                jinn_auth::FilesystemCredentialStore::new(paths.auth_path()),
+            )),
+            vec![std::sync::Arc::new(jinn_auth::OpenAiCodexAuth::new(
+                jinn_auth::BrowserLauncherService::new(std::sync::Arc::new(
+                    jinn_auth::SystemBrowserLauncher,
+                )),
+            ))],
+        );
+        // Subscription models are built in, and their availability follows the
+        // stored credential rather than an API key.
+        provider_registry.set_subscription_auth(auth.clone());
+
         let services = Services {
             paths: paths.clone(),
             handle: handle.clone(),
             llm_service: llm_service.clone(),
             provider_registry: provider_registry.clone(),
             api_keys: api_keys.clone(),
+            auth: auth.clone(),
             config_storage: config_storage.clone(),
             session_store: session_store.clone(),
             user_preferences_storage: user_preferences_storage.clone(),
@@ -301,6 +318,27 @@ impl ActorSystemBuilder {
                     deps: actor_deps.clone(),
                     state: state.clone(),
                     provider_cap: jinn_domain::common::tcaps::mint::mint_provider_cap(),
+                },
+            )
+            .restart_policy(kameo::supervision::RestartPolicy::Never)
+            .spawn()
+            .await
+        );
+
+        // ── Auth actor ─────────────────────────────────────────────────────
+        // The single owner of subscription credentials: it fills the login and
+        // logout pickers, runs login attempts, and restores a login from an
+        // earlier run on startup.
+        let _auth = spawn_tracked!(
+            &services.bus,
+            "auth",
+            "AuthActor",
+            jinn_domain::feat::auth::auth_actor::AuthActor::supervise(
+                &root,
+                jinn_domain::feat::auth::auth_actor::AuthActorDeps {
+                    deps: actor_deps.clone(),
+                    state: state.clone(),
+                    cap: jinn_domain::common::tcaps::mint::mint_auth_cap(),
                 },
             )
             .restart_policy(kameo::supervision::RestartPolicy::Never)

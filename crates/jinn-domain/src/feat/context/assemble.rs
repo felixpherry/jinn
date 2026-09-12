@@ -1195,6 +1195,38 @@ mod tests {
 
     #[rstest::rstest]
     #[test]
+    fn assemble_prompt_leaves_an_unpinned_system_notice_out_of_context() {
+        // Given a session whose history holds an account-management notice
+        // (how login and logout report themselves) and a user message.
+        let notice = ChatEntry::system("Signed in to OpenAI Codex.");
+        let user = ChatEntry::user("hello");
+        let (state, session_id) = state_with_history(vec![notice, user]);
+
+        // When assembling the prompt.
+        let guard = state.read();
+        let result = assemble_prompt(&guard, &session_id, &counter());
+
+        // Then the notice reaches the model nowhere — neither as a message nor
+        // folded into the system prompt.
+        assert!(
+            !result
+                .messages
+                .iter()
+                .any(|message| format!("{message:?}").contains("Signed in to OpenAI Codex.")),
+            "an account notice must not become a model message: {:?}",
+            result.messages
+        );
+        assert!(
+            !result
+                .system_prompt
+                .to_string()
+                .contains("Signed in to OpenAI Codex."),
+            "an account notice must not reach the system prompt",
+        );
+    }
+
+    #[rstest::rstest]
+    #[test]
     fn assemble_prompt_emits_pinned_system_entry_as_user_message() {
         // Given a session with a top-pinned System entry.
         let mut sys_entry = ChatEntry::system("Custom system instructions");

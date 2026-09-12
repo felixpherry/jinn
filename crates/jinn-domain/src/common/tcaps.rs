@@ -7,6 +7,7 @@
 //! live one-per-file under `tcaps/`; `mint.rs` is the single trust point where
 //! caps are constructed.
 
+pub mod auth;
 pub mod context;
 pub mod frontend;
 pub mod intent_handler;
@@ -18,6 +19,7 @@ pub mod session;
 #[cfg(test)]
 mod tests;
 
+pub use auth::AuthCap;
 pub use context::ContextCap;
 pub use frontend::FrontendCap;
 pub use intent_handler::IntentHandlerCap;

@@ -26,9 +26,15 @@ pub struct ProviderConfig {
 impl From<&Backend> for ProviderConfig {
     fn from(backend: &Backend) -> Self {
         match backend {
-            Backend::OpenAI | Backend::Anthropic | Backend::Google | Backend::AzureOpenAI => {
-                Self::openai()
-            }
+            // `OpenAiCodex` is not an OpenAI-compatible chat-completions
+            // backend; it speaks the Responses protocol and is routed to its
+            // own transport before reaching here. The arm exists so the match
+            // stays exhaustive, and yields the closest OpenAI shape.
+            Backend::OpenAI
+            | Backend::OpenAiCodex
+            | Backend::Anthropic
+            | Backend::Google
+            | Backend::AzureOpenAI => Self::openai(),
             Backend::OpenRouter => Self::openrouter(),
             Backend::ZAI => Self::zai(),
             Backend::DeepSeek => Self::deepseek(),

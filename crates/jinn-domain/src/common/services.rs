@@ -61,6 +61,8 @@ pub struct Services {
     pub provider_registry: ProviderRegistryService,
     /// Resolved API keys for provider availability checks and factory creation.
     pub api_keys: ApiKeysService,
+    /// Subscription authentication: stored credentials, login, and refresh.
+    pub auth: jinn_auth::AuthService,
     /// Config storage for persisting provider configuration.
     pub config_storage: ConfigStorageService,
     /// Session store for persisting chat session data.
@@ -163,6 +165,7 @@ impl Services {
                 .expect("empty config is valid"),
             ),
             api_keys: ApiKeysService::new(ApiKeys::new()),
+            auth: test_services::fake_auth_service(),
             config_storage: ConfigStorageService::new(Arc::new(InMemoryConfigStorage::new())),
             session_store: SessionStoreService::new(Arc::new(test_services::FakeSessionStore)),
             user_preferences_storage: {
@@ -212,6 +215,7 @@ impl Services {
                 .expect("empty config is valid"),
             ),
             api_keys: ApiKeysService::new(ApiKeys::new()),
+            auth: test_services::fake_auth_service(),
             config_storage: ConfigStorageService::new(Arc::new(InMemoryConfigStorage::new())),
             session_store: SessionStoreService::new(Arc::new(test_services::FakeSessionStore)),
             user_preferences_storage: {

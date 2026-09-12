@@ -56,13 +56,20 @@ pub fn handle_open_picker(state: &mut AppState, kind: PickerKind) -> IntentResul
         PickerKind::Provider => IntentResult::new_message(LoadProviderPickerEntries),
         PickerKind::Session => IntentResult::new_message(LoadSessionPickerEntries),
         PickerKind::Persona => IntentResult::new_message(LoadPersonaPickerEntries),
+        // These pickers already hold their rows, and the authentication
+        // modals load theirs through their own intents, so opening any of
+        // them asks for nothing.
         PickerKind::Theme
         | PickerKind::Tool
         | PickerKind::Skill
         | PickerKind::TaskList
         | PickerKind::Project
         | PickerKind::McpServer
-        | PickerKind::Plugin => IntentResult::empty(),
+        | PickerKind::Plugin
+        | PickerKind::AuthLogin
+        | PickerKind::AuthMethod
+        | PickerKind::AuthProgress
+        | PickerKind::AuthLogout => IntentResult::empty(),
         PickerKind::SessionLifecycle => {
             // Populate from user preferences + implicit blank lifecycle.
             load_lifecycle_picker_entries(state);
@@ -160,6 +167,10 @@ fn reset_picker_for_open(state: &mut AppState, kind: PickerKind) {
             state.frontend.endpoint_picker_mut().reset();
             state.frontend.pickers.endpoint_loading = true;
         }
+        PickerKind::AuthLogin => state.frontend.auth_login_picker_mut().reset(),
+        PickerKind::AuthMethod => state.frontend.auth_method_picker_mut().reset(),
+        PickerKind::AuthProgress => state.frontend.auth_progress_picker_mut().reset(),
+        PickerKind::AuthLogout => state.frontend.auth_logout_picker_mut().reset(),
     }
 }
 
@@ -345,6 +356,18 @@ pub fn handle_picker_confirm(state: &mut AppState) -> (IntentResult, Option<Inte
         Some(PickerKind::ReasoningEffort) => (confirm_reasoning_effort(state), None),
         Some(PickerKind::McpServer) => (crate::feat::mcp::intent::confirm_mcp(state), None),
         Some(PickerKind::Endpoint) => (confirm_endpoint(state), None),
+        Some(PickerKind::AuthLogin) => (
+            crate::feat::auth::intent::confirm_login_provider(state),
+            None,
+        ),
+        Some(PickerKind::AuthMethod) => {
+            (crate::feat::auth::intent::confirm_login_method(state), None)
+        }
+        Some(PickerKind::AuthProgress) => (
+            crate::feat::auth::intent::confirm_auth_progress(state),
+            None,
+        ),
+        Some(PickerKind::AuthLogout) => (crate::feat::auth::intent::confirm_logout(state), None),
 
         Some(PickerKind::CompactionModel | PickerKind::TaskList | PickerKind::Plugin) | None => {
             (IntentResult::empty(), None)
