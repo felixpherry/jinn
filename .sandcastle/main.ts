@@ -15,6 +15,13 @@ const env = parseEnv(await readFile(".sandcastle/.env", "utf8"));
 if (!env.GH_TOKEN?.startsWith("github_pat_")) {
   throw new Error("Configure the repository-scoped fine-grained GH_TOKEN using the credentials wizard first.");
 }
+// A long-lived `claude setup-token` token keeps the sandbox off the host's
+// rotating OAuth refresh token: seeding a copy of that shares one refresh
+// token, and whichever side refreshes second is locked out.
+const claudeToken = env.CLAUDE_CODE_OAUTH_TOKEN;
+if (claudeToken && !claudeToken.startsWith("sk-ant-oat01-")) {
+  throw new Error("CLAUDE_CODE_OAUTH_TOKEN must come from `claude setup-token`; re-run the credentials wizard.");
+}
 // Never fall back to the host's broader GitHub credentials.
 const gh = (...args: string[]) => execFileSync("gh", args, {
   cwd: root,
@@ -27,7 +34,8 @@ const assertClean = () => {
 };
 assertClean();
 if (git("branch", "--show-current") !== "trunk") throw new Error("Start Sandcastle on trunk.");
-for (const path of ["auth/pi/auth.json", "auth/claude/.credentials.json"]) {
+// Seeded Claude credentials are only needed when no long-lived token is set.
+for (const path of ["auth/pi/auth.json", ...(claudeToken ? [] : ["auth/claude/.credentials.json"])]) {
   await access(resolve(root, ".sandcastle", path));
 }
 for (const path of ["cache/registry", "cache/git", "cache/target", "logs"]) {
@@ -62,6 +70,7 @@ try {
           GH_TOKEN: env.GH_TOKEN,
           GH_REPO: repository,
           CLAUDE_CONFIG_DIR: "/home/agent/.claude",
+          ...(claudeToken ? { CLAUDE_CODE_OAUTH_TOKEN: claudeToken } : {}),
           CARGO_TARGET_DIR: "/home/agent/build-cache",
           CARGO_BUILD_JOBS: "2",
           RUSTC_WRAPPER: "",

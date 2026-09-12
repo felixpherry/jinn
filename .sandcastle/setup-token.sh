@@ -184,12 +184,12 @@ finish() {
 # Replace the example below. Set TOTAL_STAGES to match the stages you write.
 # ──────────────────────────────────────────────────────────────────────────
 
-TOTAL_STAGES=2
+TOTAL_STAGES=3
 umask 077
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$REPO_ROOT/.sandcastle/.env"
 
-banner "Sandcastle GitHub credentials"
+banner "Sandcastle credentials"
 stage "Create a repository-scoped token"
 say "Create a fine-grained token for this repository only. Do not paste it into chat."
 open_url "https://github.com/settings/personal-access-tokens/new"
@@ -233,4 +233,23 @@ fi
 note "Issue write access cannot be proven without creating an issue, so it is not tested here."
 note "Sandcastle closes issues with this token; if that fails, Issues is set to read-only."
 unset TOKEN
+
+stage "Create a long-lived Claude Code token"
+say "The sandbox needs its own Claude credential. Copying the host login shares a"
+say "refresh token that rotates, so whichever side refreshes second gets locked out."
+step "In another terminal, run: claude setup-token"
+step "Complete the browser approval, then copy the printed token."
+ask_secret CLAUDE_CODE_OAUTH_TOKEN "Paste the token (Enter to skip and keep using the seeded copy):"
+if [[ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]]; then
+  SKIPPED+=("CLAUDE_CODE_OAUTH_TOKEN (run: claude setup-token, then re-run this wizard)")
+  warn "skipped: Sandcastle will fall back to .sandcastle/auth/claude, which expires"
+elif [[ ! "$CLAUDE_CODE_OAUTH_TOKEN" =~ ^sk-ant-oat01-[A-Za-z0-9_-]+$ ]]; then
+  warn "Expected a sk-ant-oat01- token from claude setup-token; nothing saved."
+  SKIPPED+=("CLAUDE_CODE_OAUTH_TOKEN (re-run this wizard with the setup-token output)")
+else
+  write_env CLAUDE_CODE_OAUTH_TOKEN "$CLAUDE_CODE_OAUTH_TOKEN"
+  chmod 600 "$ENV_FILE"
+fi
+unset CLAUDE_CODE_OAUTH_TOKEN
+
 finish
