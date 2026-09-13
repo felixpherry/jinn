@@ -15,6 +15,7 @@ use jinn_domain::{FocusScope, Intent, PickerKind};
 use ratatui::Frame;
 use ratatui_which_key::{CrosstermKeymapExt as _, WhichKeyState};
 
+use crate::clipboard::ClipboardService;
 use crate::config::TuiConfig;
 use crate::msg::Msg;
 use crate::render;
@@ -58,6 +59,8 @@ pub struct TuiApp {
     /// Set to `true` when a selection is finalized and the selected text
     /// should be copied to the system clipboard during the next render.
     pub pending_clipboard: bool,
+    /// Shared asynchronous access to the system clipboard.
+    pub clipboard: ClipboardService,
     /// TUI configuration (mouse capture, etc.).
     pub config: TuiConfig,
     /// Sidebar container with registered sections.
@@ -101,6 +104,20 @@ impl TuiApp {
                     let _ = self.core.bridge.send(closure);
                 }
             }
+            Msg::Clipboard(completion) => match completion {
+                crate::clipboard::ClipboardCompletion::Success { backend, text_len } => {
+                    tracing::debug!(backend, text_len, "copied text to clipboard");
+                }
+                crate::clipboard::ClipboardCompletion::Failed { backend, error } => {
+                    tracing::warn!(backend, error, "failed to copy text to clipboard");
+                    self.core
+                        .state
+                        .write(&self.intent_handler_cap)
+                        .frontend
+                        .status_hint =
+                        Some("failed to copy to clipboard; see log for details".to_owned());
+                }
+            },
             Msg::Input(event) => {
                 // Sync scope from state before processing key.
                 // This ensures the which-key scope matches the actual scope stack,
@@ -262,20 +279,9 @@ impl TuiApp {
                 .request(SuspendAction::ChangeCwd { search_root });
         }
         if let Some(text) = signals.yank_text {
-            std::thread::spawn(move || {
-                let mut cb = match arboard::Clipboard::new() {
-                    Ok(cb) => cb,
-                    Err(e) => {
-                        tracing::warn!(err = %e, "failed to create clipboard");
-                        return;
-                    }
-                };
-                if let Err(e) = cb.set_text(&text) {
-                    tracing::warn!(err = %e, "failed to yank entry to clipboard");
-                    return;
-                }
-                tracing::debug!(len = text.len(), "yanked entry to clipboard");
-                std::thread::sleep(std::time::Duration::from_secs(2));
+            let sender = self.events.sender();
+            self.clipboard.copy(text, move |completion| {
+                sender.send(Msg::Clipboard(completion));
             });
         }
 

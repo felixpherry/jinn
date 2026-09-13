@@ -3,6 +3,7 @@
 use jinn_domain::AppCore;
 
 use super::TuiApp;
+use crate::clipboard::ClipboardService;
 
 /// Builder for constructing a [`TuiApp`] with sensible defaults for tests.
 ///
@@ -15,6 +16,8 @@ pub struct TuiAppBuilder {
     services: Option<jinn_domain::Services>,
     /// Optional app state override (defaults to default state).
     state: Option<jinn_domain::AppState>,
+    /// Optional clipboard service override (defaults to the native backend).
+    clipboard: Option<ClipboardService>,
 }
 
 impl TuiAppBuilder {
@@ -29,6 +32,13 @@ impl TuiAppBuilder {
     #[must_use]
     pub fn state(mut self, state: jinn_domain::AppState) -> Self {
         self.state = Some(state);
+        self
+    }
+
+    /// Override the clipboard service.
+    #[must_use]
+    pub fn clipboard(mut self, clipboard: ClipboardService) -> Self {
+        self.clipboard = Some(clipboard);
         self
     }
 
@@ -49,6 +59,6 @@ impl TuiAppBuilder {
             bridge: services.bridge.clone(),
         };
 
-        crate::launch::launch_for_test(core, services)
+        crate::launch::launch_for_test(core, services, self.clipboard.unwrap_or_default())
     }
 }

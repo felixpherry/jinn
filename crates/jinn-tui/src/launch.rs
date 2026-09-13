@@ -15,6 +15,7 @@ use jinn_domain::{AppCore, AppUiRegistry, State};
 use wherror::Error;
 
 use crate::app::WhichKeyInstance;
+use crate::clipboard::ClipboardService;
 use crate::config::TuiConfig;
 use crate::keymap;
 use crate::scope::Scope;
@@ -110,6 +111,7 @@ pub fn launch(
         selection: SelectionState::Idle,
         selectable_rects: SelectableRects::default(),
         pending_clipboard: false,
+        clipboard: ClipboardService::native(),
         config: tui_config,
         sidebar: {
             let mut s = Sidebar::new();
@@ -173,7 +175,11 @@ pub fn load_theme(
 /// This is what [`crate::TuiAppBuilder`] delegates to so that tests still go
 /// through the single keymap-bootstrap site without requiring real on-disk
 /// prompt/theme files.
-pub fn launch_for_test(core: AppCore, services: jinn_domain::Services) -> TuiApp {
+pub fn launch_for_test(
+    core: AppCore,
+    services: jinn_domain::Services,
+    clipboard: ClipboardService,
+) -> TuiApp {
     let mut ui_registry = AppUiRegistry::new();
     jinn_domain::register_all_ui_elements(&mut ui_registry);
 
@@ -194,6 +200,7 @@ pub fn launch_for_test(core: AppCore, services: jinn_domain::Services) -> TuiApp
         selection: SelectionState::Idle,
         selectable_rects: SelectableRects::default(),
         pending_clipboard: false,
+        clipboard,
         config: TuiConfig::default(),
         sidebar: {
             let mut s = Sidebar::new();

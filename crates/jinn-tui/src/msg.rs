@@ -18,6 +18,8 @@ pub enum Msg {
     Tick,
     /// A crossterm terminal event (key press, resize, etc.).
     Input(crossterm::event::Event),
+    /// Completion of an asynchronous platform clipboard write.
+    Clipboard(crate::clipboard::ClipboardCompletion),
 }
 
 impl std::fmt::Debug for Msg {
@@ -25,6 +27,7 @@ impl std::fmt::Debug for Msg {
         match self {
             Self::Tick => f.write_str("Tick"),
             Self::Input(e) => f.debug_tuple("Input").field(e).finish(),
+            Self::Clipboard(completion) => f.debug_tuple("Clipboard").field(completion).finish(),
         }
     }
 }

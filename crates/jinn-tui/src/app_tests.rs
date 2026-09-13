@@ -4,11 +4,16 @@
     clippy::needless_lifetimes,
     reason = "test file, panics are acceptable"
 )]
+use std::sync::Arc;
+use std::time::Duration;
+
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+use error_stack::Report;
 use ratatui::layout::Rect;
 
 use crate::TuiApp;
 use crate::app::{WhichKeyInstance, scope_for_focus};
+use crate::clipboard::{ClipboardBackend, ClipboardCompletion, ClipboardError, ClipboardService};
 use crate::config::TuiConfig;
 use crate::keymap;
 use crate::msg::Msg;
@@ -18,6 +23,195 @@ use crate::selection::SelectionState;
 /// Creates a minimal `TuiApp` for testing.
 async fn test_app() -> TuiApp {
     TuiApp::test_builder().build().await
+}
+
+#[derive(Debug)]
+struct ChannelClipboard {
+    copied: std::sync::mpsc::Sender<String>,
+}
+
+impl ClipboardBackend for ChannelClipboard {
+    fn name(&self) -> &'static str {
+        "channel"
+    }
+
+    fn set_text(&self, text: &str) -> Result<(), Report<ClipboardError>> {
+        self.copied
+            .send(text.to_owned())
+            .map_err(|_send_error| Report::new(ClipboardError))
+    }
+}
+
+async fn app_recording_clipboard() -> (TuiApp, std::sync::mpsc::Receiver<String>) {
+    let (copied, receiver) = std::sync::mpsc::channel();
+    let clipboard = ClipboardService::new(Arc::new(ChannelClipboard { copied }));
+    let app = TuiApp::test_builder().clipboard(clipboard).build().await;
+    (app, receiver)
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn clipboard_success_preserves_existing_status_hint() {
+    // Given an app with a domain-specific clipboard success hint.
+    let mut app = test_app().await;
+    app.core.state.write_test_no_cap().frontend.status_hint =
+        Some("yanked 3 terminal lines to the clipboard".to_owned());
+
+    // When handling a successful clipboard completion.
+    app.handle_msg(Msg::Clipboard(ClipboardCompletion::Success {
+        backend: "test",
+        text_len: 12,
+    }));
+
+    // Then the existing status hint remains unchanged.
+    assert_eq!(
+        app.core.state.read().frontend.status_hint.as_deref(),
+        Some("yanked 3 terminal lines to the clipboard")
+    );
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn clipboard_failure_sets_visible_status_hint() {
+    // Given an app without a status hint.
+    let mut app = test_app().await;
+
+    // When handling a failed clipboard completion.
+    app.handle_msg(Msg::Clipboard(ClipboardCompletion::Failed {
+        backend: "test",
+        error: "clipboard unavailable".to_owned(),
+    }));
+
+    // Then the app exposes a concise failure hint.
+    assert_eq!(
+        app.core.state.read().frontend.status_hint.as_deref(),
+        Some("failed to copy to clipboard; see log for details")
+    );
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn clipboard_failure_replaces_speculative_success_hint() {
+    // Given an app with a success hint staged before the platform write.
+    let mut app = test_app().await;
+    app.core.state.write_test_no_cap().frontend.status_hint =
+        Some("yanked 3 terminal lines to the clipboard".to_owned());
+
+    // When the platform clipboard write fails.
+    app.handle_msg(Msg::Clipboard(ClipboardCompletion::Failed {
+        backend: "test",
+        error: "clipboard unavailable".to_owned(),
+    }));
+
+    // Then failure feedback takes precedence over speculative success.
+    assert_eq!(
+        app.core.state.read().frontend.status_hint.as_deref(),
+        Some("failed to copy to clipboard; see log for details")
+    );
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn clipboard_worker_completion_arrives_on_tui_message_queue() {
+    // Given an app with a successful recording clipboard backend.
+    let (app, _copied) = app_recording_clipboard().await;
+    let sender = app.events.sender();
+
+    // When dispatching a clipboard write through the shared service.
+    app.clipboard
+        .copy("message marker".to_owned(), move |completion| {
+            sender.send(Msg::Clipboard(completion));
+        });
+    let message = app.events.recv().expect("clipboard completion message");
+
+    // Then its result arrives as a clipboard message for the TUI thread.
+    assert!(matches!(
+        message,
+        Msg::Clipboard(ClipboardCompletion::Success {
+            backend: "channel",
+            text_len: 14,
+        })
+    ));
+}
+
+fn install_terminal_screen(app: &TuiApp, screen: &str) {
+    let mut state = app.core.state.write_test_no_cap();
+    let session_id = state.session.active_session_id().clone();
+    state
+        .frontend
+        .scope_stack
+        .push(jinn_domain::FocusScope::TerminalView);
+    state.frontend.terminal.apply_screen(
+        &session_id,
+        "term-test",
+        screen.to_owned(),
+        jinn_domain::feat::interactive_term::emulator::ScreenCells::default(),
+        (0, 0),
+        false,
+    );
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn chat_entry_yank_uses_shared_clipboard_backend() {
+    // Given an app with a selected entry and recording clipboard backend.
+    let (mut app, copied) = app_recording_clipboard().await;
+    {
+        let mut state = app.core.state.write_test_no_cap();
+        state
+            .active_session_mut()
+            .push_entry(jinn_domain::ChatEntry::user("chat yank marker"));
+        state.active_session_mut().select_next_entry();
+    }
+
+    // When yanking the selected entry.
+    app.route_intent(jinn_domain::Intent::YankSelectedEntry);
+
+    // Then the shared backend receives its exact yank text.
+    assert_eq!(
+        copied
+            .recv_timeout(Duration::from_secs(1))
+            .expect("clipboard write"),
+        "chat yank marker"
+    );
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn terminal_yank_uses_shared_clipboard_backend() {
+    // Given an app viewing a mirrored terminal screen.
+    let (mut app, copied) = app_recording_clipboard().await;
+    install_terminal_screen(&app, "terminal yank marker");
+
+    // When yanking the terminal screen.
+    app.route_intent(jinn_domain::Intent::TerminalYank);
+
+    // Then the shared backend receives the exact screen text.
+    assert_eq!(
+        copied
+            .recv_timeout(Duration::from_secs(1))
+            .expect("clipboard write"),
+        "terminal yank marker"
+    );
+}
+
+#[rstest::rstest]
+#[tokio::test]
+async fn terminal_yank_and_push_uses_shared_clipboard_backend() {
+    // Given an app viewing a mirrored terminal screen.
+    let (mut app, copied) = app_recording_clipboard().await;
+    install_terminal_screen(&app, "terminal push marker");
+
+    // When yanking and pushing the screen.
+    app.route_intent(jinn_domain::Intent::TerminalPushScreen);
+
+    // Then the shared backend receives the exact screen text.
+    assert_eq!(
+        copied
+            .recv_timeout(Duration::from_secs(1))
+            .expect("clipboard write"),
+        "terminal push marker"
+    );
 }
 
 #[rstest::rstest]
